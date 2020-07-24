@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" charset="UTF-8"/>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <link href='https://fonts.googleapis.com/css?family=Roboto' rel='stylesheet'>
+    <link rel="stylesheet" href="Files/styles.css">
+</head>
+<body>
+    <script>
+        window.onload = function() {
+            localStorage.clear();
+            let playerInput = document.getElementById("player");
+            playerInput.addEventListener("keyup", function(event) {
+                if (event.keyCode === 13) {
+                    event.preventDefault();
+                    addPlayer();
+                }
+            });
+        }
+
+        function addPlayer() {
+            let player = document.getElementById("player").value;
+            if(player !== '') {
+                let players = JSON.parse(localStorage.getItem('players')) || [];
+                players.push({nick: player, points: 0, id: players.length});
+                document.getElementById("player").value = "";
+                localStorage.setItem('players', JSON.stringify(players));
+                let html = "<ul>\n"
+                for (let i = 0; i< players.length; i++) {
+                   // html += "<li>" + players[i].nick + ": " + players[i].points + "</li>\n";
+                    html += "<li>" + players[i].nick + "</li>\n"
+                }
+                html += "</ul>\n"
+                $( "div.players" ).html( html );
+            }
+        }
+
+        function allowGameStart() {
+            let players = JSON.parse(localStorage.getItem('players'));
+            let questions = JSON.parse(localStorage.getItem('questions'));
+            let timer = document.getElementById('timer').value;
+            if (players) {
+                if(questions) {
+                    if(parseInt(timer) && timer > 0) {
+                        let options = {polska: false, samogloski: false};
+                        if ($('#samogloski').prop('checked')) {
+                            options.samogloski = true;
+                        }
+                        if ($('#polska').prop('checked')) {
+                            options.polska = true;
+                        }
+                        options.timer = timer;
+                        localStorage.setItem('options', JSON.stringify(options));
+                        localStorage.setItem('categoryActivePlayer', JSON.stringify(players[0]));
+                        location.href = 'kategorie.html';
+                    } else {
+                        window.alert('Ustaw czas na rundę!');
+                    }
+                } else {
+                    window.alert('Brak pytań!');
+                }
+                
+            } else {
+                window.alert('Brak graczy!');
+            }
+        }
+    </script>
+    <div class="maincontainer">
+        <div class="secondcontainer">
+            <div class='gameheader'>            
+                <div class='showActivePlayer'>
+                    Wybierz plik z pytaniami
+                </div>
+                <div class="leftaligned buttoncontainer">
+                    <input id="loadfile" class="loadfile" type="file" size="100"></input>
+                    <script src="Files/loadQuestions.js"></script>
+                </div>
+                <div class='showActivePlayer'>
+                    Dodaj graczy
+                </div>
+                <div class="leftaligned" >
+                    <div style="height: 30px;">
+                        Podaj nazwę gracza:
+                        <input id="player" type="text"/> 
+                        <button onClick=addPlayer() 
+                        style="background-color: rgb(49, 143, 25);color: white;
+                                border: none; height: 100%; width: 30px;  font-size: 20px"> + </button>
+
+                    </div>    
+                </div>
+                <div class='showActivePlayer'>
+                    Opcje
+                </div>
+                <div class="leftaligned" style="padding-bottom: 30px; padding-top: 30px;">
+                    <table>
+                        <tr>
+                            <td>Sekund na rundę</td>
+                            <td><input id="timer" value=30 style="width: 50px; margin: 10px;"/></td>
+                        </tr>
+                        <tr>
+                            <td>Polskie znaki</td>
+                            <td><input type="checkbox" id="polska" style="height: 20px; width: 20px; margin: 10px;"/> </td>
+                        </tr>
+                        <tr>
+                            <td>Samogłoski</td>
+                            <td><input type="checkbox" id="samogloski" style="height: 20px; width: 20px; margin: 10px; margin-bottom: 0;"/> </td>
+                        </tr>
+                    </table>
+
+                </div>
+                <div class="buttoncontainer">
+                    <button class="buttonStart" onclick="allowGameStart();">Zacznij grę!</button>
+                </div>
+            </div>
+            <div class="rightcontainer">
+                <h1 style='text-align: center;'>Lista graczy:</h1>
+                <div class="players"></div>
+            </div>
+        </div>
+        <div id="snackbar"></div>
+    </div>
+</body>
+</html>

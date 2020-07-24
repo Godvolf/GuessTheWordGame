@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<link rel="stylesheet" href="Files/styles.css">
+</head>
+<body>
+<script>
+let flag = false;
+let shortFlag = false;
+// Function for controlling in game timer
+function startTimer(display) {
+    let duration = parseInt(JSON.parse(localStorage.getItem('options')).timer);
+    let timer = duration;
+    let minutes;
+    let seconds
+    setInterval(function () {
+        if (flag) {
+            timer = duration;
+            display.style.color = 'black';
+            display.style.backgroundColor = 'white';
+            flag = false;
+        }
+        minutes = parseInt(timer / 60, 10);
+        seconds = parseInt(timer % 60, 10);
+
+        minutes = minutes < 10 ? "0" + minutes : minutes;
+        seconds = seconds < 10 ? "0" + seconds : seconds;
+        display.textContent = minutes + ":" + seconds;
+
+        if (timer === 0) {
+            console.log(display);
+            display.style.backgroundColor = 'red';
+            display.style.color = 'white';
+
+        } else if (!shortFlag && --timer < 0) {
+            timer = duration;
+        }
+    }, 1000);
+}
+
+function guessLetter(letter) {
+    newLetter(letter);
+}
+
+function newLetter(letter, first) {
+    let word = JSON.parse(localStorage.getItem('word'));
+    let displayed = JSON.parse(localStorage.getItem('displayedWord'));
+    let letterFound = 0;
+    word = word.word;
+    for (let i = 0; i<word.length; i++) {
+        if (word.charAt(i).toLowerCase() === letter) {
+            letterFound ++;
+            displayed = setCharAt(displayed, i, word.charAt(i));
+        }
+    }
+    $( "#" + letter ).prop("disabled",true);
+    if (letterFound > 0) {
+        flag = true;
+        if (displayed.indexOf('_') === -1) {
+            addPoint();
+            return;
+        }
+        if (!first) {
+            showSnackBarGreen("Trafienia: " + letterFound);
+        }
+        localStorage.setItem('displayedWord', JSON.stringify(displayed));
+        displayWord(displayed);
+        return;
+    } else {
+        mistake(first);
+        if (first) {
+            displayWord(displayed);
+        }
+    }
+}
+
+function displayWord(word) {
+    let formatted = '';
+    for (let i = 0; i<word.length; i++ ) {
+        if(word.charAt(i) === ' ') {
+            formatted += '<br>';
+        } else {
+            formatted += '' + word.charAt(i) + ' ';
+        }
+    }
+    $( "div.word" ).html( formatted );
+}
+
+function setCharAt(str,index,chr) {
+    if(index > str.length-1) return str;
+    return str.substr(0,index) + chr + str.substr(index+1);
+}
+
+// Function for set next player as active
+function nextPlayer(mistake, timer, firstletter) {
+    let activePlayer = JSON.parse(localStorage.getItem('activePlayer'));
+    let players = JSON.parse(localStorage.getItem('players'));
+    if (activePlayer.id < players.length-1 ) {
+        activePlayer = players[activePlayer.id + 1];
+    } else {
+        activePlayer = players[0];
+    };
+    localStorage.setItem('activePlayer', JSON.stringify(activePlayer));
+    $( "span.activePlayer" ).html( activePlayer.nick );
+    if (mistake && !firstletter) {
+        showSnackBar("Pudło!<br>Tura gracza: " + activePlayer.nick);
+    } 
+    if (timer) {
+        showSnackBar("Skończył się czas!<br>Tura gracza: " + activePlayer.nick);
+    }
+    showScoreboard();
+}
+
+// Correct guess!
+function addPoint() {
+    if (!shortFlag) {
+        let players = JSON.parse(localStorage.getItem('players'));
+        let activePlayer = JSON.parse(localStorage.getItem('activePlayer'));
+        let word = JSON.parse(localStorage.getItem('word'));
+        let category = JSON.parse(localStorage.getItem('category'))
+        players[activePlayer.id].points += 1;
+        localStorage.setItem('players', JSON.stringify(players));
+        category.words.splice(word.index, 1);
+        if (category.words.length > 0) {
+            showSnackBarGreen(activePlayer.nick + " odgadł hasło i zdobywa punkt!");
+            displayWord(word.word);
+            showScoreboard();
+            shortFlag = true;
+            setTimeout(()=>{
+                resetButtons();
+                nextPlayer();
+                localStorage.setItem('category', JSON.stringify(category));
+                newWord(true);
+                word = JSON.parse(localStorage.getItem('displayedWord'));
+                displayWord(word);
+                actualizeQuestionNumber();
+                shortFlag = false;
+            }, 3000)
+        
+        } else {
+            let questions = JSON.parse(localStorage.getItem('questions'));
+            for (let i = 0; i< questions.length; i++) {
+                if(questions[i].name === category.name) {
+                    console.log(i);
+                    questions[i].words = [];
+                    break;
+                }
+            }
+            localStorage.setItem('questions', JSON.stringify(questions));
+            let id = JSON.parse(localStorage.getItem('categoryActivePlayer')).id;
+            if (id === players.length - 1 ) {
+                id = 0;
+            } else {
+                id ++;
+            }
+            localStorage.setItem('categoryActivePlayer', JSON.stringify(players[id]));
+            localStorage.setItem('toastr', JSON.stringify(activePlayer.nick + "odgadł ostatnie hasło z kategorii " + category.name + "!"));
+            location.href = 'kategorie.html';
+        }
+    }
+}
+
+function newWord(firstLetter) {
+    let category = JSON.parse(localStorage.getItem('category'));
+    let words = category.words;
+    let randomIndex = Math.floor(Math.random() * words.length)
+    let word = words[randomIndex];
+    word.category = category.name;
+    word.index = randomIndex;
+    localStorage.setItem('word', JSON.stringify(word));
+    let displayed = '';
+    for(let i = 0; i< word.word.length; i++) {
+        if(word.word[i] === ' ') {
+            displayed += ' ';
+        } else if(word.word[i] === ',') {
+            displayed += ',';
+        } else if(word.word[i] === '.') {
+            displayed += '.';
+        } else if(word.word[i] === ':') {
+            displayed += ':';
+        } else if(word.word[i] === '\'') {
+            displayed += '\'';
+        } else if(word.word[i] === '?') {
+            displayed += '?';
+        }
+        else {
+            displayed += '_';
+        }
+    }
+    localStorage.setItem('displayedWord', JSON.stringify(displayed));
+    let letter = word.letter;
+    if (firstLetter) {
+        newLetter(letter, true);
+    } else {
+        newLetter(letter);
+    }
+}
+
+// Wrong guess!
+function mistake(firstletter) {
+    flag = true;
+    nextPlayer(true, false, firstletter);
+}
+
+function resetButtons() {
+    $( ".letter" ).prop("disabled", false);
+
+}
+function hideButtons() {
+    const options = JSON.parse(localStorage.getItem('options'));
+    if (!options.polska) {
+        $( ".polska" ).prop("hidden",true);
+    }
+    if(!options.samogloski) {
+        $( ".samogloska" ).prop("hidden",true);
+    }
+}
+
+window.onload = function () {
+    let activePlayer = JSON.parse(localStorage.getItem('activePlayer'));
+    let category = JSON.parse(localStorage.getItem('category'));
+    display = document.querySelector('#time');
+    startTimer(display);
+    $( "span.activePlayer" ).html( activePlayer.nick );
+    newWord(true);
+    hideButtons();
+    showScoreboard();
+    let width = $('span.timer').width();
+    let height = $('span.timer').height();
+    $('div.categoryName').html(category.name.replace(/-/g, ' '));
+    $('div.showCategoryName').css('margin-left',width +'px');
+    $('div.showCategoryName').css('min-height',height +'px');
+    actualizeQuestionNumber();
+};
+
+function actualizeQuestionNumber() {
+    let category = JSON.parse(localStorage.getItem('category'));
+    let questions = JSON.parse(localStorage.getItem('questions'));
+    for (let i= 0; i<questions.length; i++) {
+        if (questions[i].name === category.name) {
+            questions = questions[i];
+            break;
+        }
+    }
+    let count = questions.words.length - category.words.length + 1;
+    $('div.showquestionnumber').html( 'Pytanie ' + count + ' z ' + questions.words.length);
+}
+window.addEventListener("keyup", function(event) {
+    if(event.keyCode >= 45 && event.keyCode <= 90) {  
+        let letter = String.fromCharCode(event.keyCode).toLowerCase();
+        if (
+            $( "#" + letter ).prop("disabled") === false &&
+            $( "#" + letter ).prop("hidden") === false
+        ) {
+            guessLetter(letter);
+        }
+    }
+});
+
+let toastrId = 0;
+function showSnackBar(message) {
+    toastrId++;
+    if(toastrId > 0) {
+        toastrId === 0;
+    }
+    let localToastrId = toastrId;
+    var x = document.getElementById("snackbar");
+    if (x.className !== "show") {
+        $( "#snackbar ").html( message );
+        x.className = "show";
+        setTimeout(function(){ 
+            if(toastrId == localToastrId) {
+                x.className = x.className.replace("show", ""); 
+            }
+        }, 2000);
+    } else {
+        x.className = x.className.replace('show', "");
+        setTimeout(function() {
+            $( "#snackbar ").html( message );
+            x.className = "show";
+            setTimeout(function(){ 
+                if(toastrId == localToastrId) {
+                    x.className = x.className.replace("show", ""); 
+                }
+            }, 2000);
+        }, 100)
+       
+    }
+}
+let greenToastrId = 0;
+function showSnackBarGreen(message) {
+    greenToastrId++;
+    if(greenToastrId > 0) {
+        greenToastrId === 0;
+    }
+    let localToastrId = greenToastrId;
+    var x = document.getElementById("snackbarGreen");
+    if (x.className !== "show") {
+        $( "#snackbarGreen ").html( message );
+        x.className = "show";
+        setTimeout(function(){ 
+            if(greenToastrId == localToastrId) {
+                x.className = x.className.replace("show", ""); 
+            }
+        }, 2000);
+    } else {
+        x.className = x.className.replace('show', "");
+        setTimeout(function() {
+            $( "#snackbarGreen ").html( message );
+            x.className = "show";
+            setTimeout(function(){ 
+                if(greenToastrId == localToastrId) {
+                    x.className = x.className.replace("show", ""); 
+                }
+            }, 2000);
+        }, 100)
+    }
+}
+
+function showScoreboard() {
+    let activePlayer = JSON.parse(localStorage.getItem('activePlayer'));
+    let players = JSON.parse(localStorage.getItem('players'));
+    let html = "<ul>\n"
+        for (let i = 0; i< players.length; i++) {
+            if (players[i].nick === activePlayer.nick) {
+                    html += "<li><span style='font-weight: bold;'>" + players[i].nick + "</span>: " + players[i].points + "</li>\n"
+                } else {
+                    html += "<li>" + players[i].nick + ": " + players[i].points + "</li>\n"
+                }
+        }
+        html += "</ul>\n"
+    $( "div.players" ).html( html );
+}
+
+function backToCategories() {
+    let questions = JSON.parse(localStorage.getItem('questions'));
+    let category = JSON.parse(localStorage.getItem('category'));
+    let players = JSON.parse(localStorage.getItem('players'));
+
+    for (let i = 0; i< questions.length; i++) {
+        if(questions[i].name === category.name) {
+            questions[i] = category;
+            break;
+        }
+    }
+    localStorage.setItem('questions', JSON.stringify(questions));
+    let id = JSON.parse(localStorage.getItem('categoryActivePlayer')).id;
+    if (id === players.length - 1 ) {
+        id = 0;
+    } else {
+        id ++;
+    }
+    localStorage.setItem('categoryActivePlayer', JSON.stringify(players[id]));
+    location.href = 'kategorie.html';
+}
+</script>
+<div class="maincontainer">
+    <div class="secondcontainer">
+        <div class='gameheader'>
+                <span id="time" class="timer">
+                    11:11
+                </span>
+                <div class='showCategoryName'>
+                    <div class="categoryName" style="width: 100%; margin: 0;">
+                        Kategoria:
+                    </div>
+                    <div class="showquestionnumber" style="width: 100%; margin: 0;">
+                        Pytanie:
+                    </div> 
+                </div>
+                <div class='showActivePlayer'>
+                    <span>Aktywny gracz:</span>
+                    <span class="activePlayer"></span>
+                </div>  
+                
+            <div class="gameleftcontainer">
+                <div id="snackbar"></div>
+                <div id="snackbarGreen"></div>
+                <div class="word" style="font-size: 70px;"></div>
+                <div class="letters">
+                    <button id="a" class='samogloska letter' onClick="guessLetter('a');">a</button>
+                    <button id="ą" class='samogloska polska letter' onClick="guessLetter('ą');">ą</button>
+                    <button id="b" class='letter' onClick="guessLetter('b');">b</button>
+                    <button id="c" class='letter' onClick="guessLetter('c');">c</button>
+                    <button id="ć" class='polska letter' onClick="guessLetter('ć');">ć</button>
+                    <button id="d" class='letter' onClick="guessLetter('d');">d</button>
+                    <button id="e" class='samogloska letter' onClick="guessLetter('e');">e</button>
+                    <button id="ę" class='samogloska polska letter' onClick="guessLetter('ę');">ę</button>
+                    <button id="f" class='letter' onClick="guessLetter('f');">f</button>
+                    <button id="g" class='letter' onClick="guessLetter('g');">g</button>
+                    <button id="h" class='letter' onClick="guessLetter('h');">h</button>
+                    <button id="i" class='samogloska letter' onClick="guessLetter('i');">i</button>
+                    <button id="j" class='letter' onClick="guessLetter('j');">j</button>
+                    <button id="k" class='letter' onClick="guessLetter('k');">k</button>
+                    <button id="l" class='letter' onClick="guessLetter('l');">l</button>
+                    <button id="ł" class='polska letter' onClick="guessLetter('ł');">ł</button>
+                    <button id="m" class='letter' onClick="guessLetter('m');">m</button>
+                    <button id="n" class='letter' onClick="guessLetter('n');">n</button>
+                    <button id="ń" class='polska letter' onClick="guessLetter('ń');">ń</button>
+                    <button id="o" class='samogloska letter' onClick="guessLetter('o');">o</button>
+                    <button id="ó" class='samogloska polska letter' onClick="guessLetter('ó');">ó</button>
+                    <button id="p" class='letter' onClick="guessLetter('p');">p</button>
+                    <button id="q" class='letter' onClick="guessLetter('q');">q</button>
+                    <button id="r" class='letter' onClick="guessLetter('r');">r</button>
+                    <button id="s" class='letter' onClick="guessLetter('s');">s</button>
+                    <button id="ś" class='polska letter' onClick="guessLetter('ś');">ś</button>
+                    <button id="t" class='letter' onClick="guessLetter('t');">t</button>
+                    <button id="u" class='samogloska letter' onClick="guessLetter('u');">u</button>
+                    <button id="v" class='letter' onClick="guessLetter('v');">v</button>
+                    <button id="w" class='letter' onClick="guessLetter('w');">w</button>
+                    <button id="x" class='letter' onClick="guessLetter('x');">x</button>
+                    <button id="y" class='samogloska letter' onClick="guessLetter('y');">y</button>
+                    <button id="z" class='letter' onClick="guessLetter('z');">z</button>
+                    <button id="ź" class='polska letter' onClick="guessLetter('ź');">ź</button>
+                    <button id="ż" class='polska letter' onClick="guessLetter('ż');">ż</button>
+                </div>
+                    <button onclick="backToCategories();" style="width: 130px; height: 50px; color: white; font-size: 18px;
+                    background-color: #3a365e; border: none; margin: 10px; cursor: pointer;">Wróć do kategorii</button>
+                    <button onclick="mistake();" style="width: 130px; height: 50px; color: white; font-size: 18px;
+                    background-color: #970012; border: none; margin: 10px; cursor: pointer;">Następny gracz</button>
+                    <button onclick="addPoint();" style="width: 130px; height: 50px; color: white; font-size: 18px;
+                    background-color: rgb(49, 143, 25); border: none; margin: 10px; cursor: pointer;">Zalicz punkt</button>
+                </div>
+        </div>
+        <div class="rightcontainer">
+            <button onclick="location.href='index.html'" class="exitBtn" title='Zakończ rozgrywkę'>X</button>
+            <h1 style='text-align: center;'>Tabela wyników</h1>
+            <div class="players"></div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

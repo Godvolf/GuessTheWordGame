@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<link rel="stylesheet" href="Files/styles.css">
+</head>
+<body>
+<script>
+    window.onload = function() {
+        let activePlayer = JSON.parse(localStorage.getItem('categoryActivePlayer'));
+        let questions = JSON.parse(localStorage.getItem('questions'));
+        let categories = "";
+        for (let i = 0; i< questions.length; i++) {
+            categories += 
+                "<button " +
+                    "id=" + questions[i].name + 
+                    " class='categoriesBtn'" + 
+                    " onclick=\"categorySelected(event);\" " + 
+                ">" +
+                    "<div id=" + questions[i].name + " style=' padding: 2px'>" +
+                    "<div style='height: 70px;  display: flex; justify-content: center; align-items: center;'>" + questions[i].name.replace(/-/g, ' ') + "</div>"+
+                    "<div style='font-size: 15px'>Ilość pytań: " + questions[i].words.length +
+                    "</div></div>" +
+                "</button>\n";
+        }
+        $( "div.categoriescontainer").html( categories );
+        // disable buttons
+        let endGame = 0;
+        for (let i = 0; i< questions.length; i++) {
+            if (questions[i].words.length === 0) {
+                document.getElementById(questions[i].name).disabled = true;
+                endGame++;
+            }
+        }
+        if(endGame === questions.length) {
+            document.getElementById("players").style.visibility = "hidden";
+            document.getElementById("showResults").style.visibility = "visible";
+            let players = JSON.parse(localStorage.getItem('players'));
+            players = players.sort(function(a, b) {
+                return b.points - a.points;
+            });
+            let positionCounter = 1;
+            let draftCounter = 0;
+            let firstplace = true;
+            let winners = [players[0].nick];
+            let html = "<table class='resultstable'>" +
+                "<tr><td>" + positionCounter + ".</td><td>" + players[positionCounter - 1].nick + "</td><td>" + players[positionCounter - 1].points + "p.</td>";
+            for (let i = 1; i<players.length; i++) {
+                if(players[i].points === players[i-1].points) {
+                    draftCounter++;
+                    html += "<tr><td>" + positionCounter + ".</td><td>" + players[i].nick + "</td><td>" + players[i].points + "p.</td>";
+                    if (firstplace) {
+                        winners.push(players[i].nick);
+                    }
+                } else {
+                    firstplace = false;
+                    positionCounter += draftCounter + 1;
+                    draftCounter = 0;
+                    html += "<tr><td>" + positionCounter + ".</td><td>" + players[i].nick + "</td><td>" + players[i].points + "p.</td>";;
+                }
+            }
+            html += '</table>'
+            $( "div.results" ).html( html );
+            $( "#wybierzkategorie").html( "Koniec gry!" );
+            $( "#rightheader").html( "Wyniki: ");
+            if (winners.length > 1) {
+                $( "#aktywnygracz" ).html( 'Zwycięzcy: ' );
+                html = winners[0];
+                for (let i = 1; i< winners.length; i++ ) {
+                    html += ', ' + winners[i];
+                }
+                $( "span.activePlayer" ).html( html );
+            } else {
+                $( "#aktywnygracz" ).html( 'Zwycięzca: ' );
+                $( "span.activePlayer" ).html( winners[0] );
+            }
+        } else {
+            showScoreboard();
+            $( "span.activePlayer" ).html( activePlayer.nick );
+            $( "#aktywnygracz" ).html( 'Aktywny gracz: ' );
+        }
+        let toastr = JSON.parse(localStorage.getItem('toastr'));
+            if (toastr) {
+                $( "#snackbarGreen ").html( toastr.replace(/-/g, ' ') );
+                showSnackBarGreen();
+                localStorage.removeItem('toastr');
+            }
+    };
+
+    function showScoreboard(){
+        let activePlayer = JSON.parse(localStorage.getItem('categoryActivePlayer'));
+        let players = JSON.parse(localStorage.getItem('players'));
+        let html = "<ul>\n"
+            for (let i = 0; i< players.length; i++) {
+                if (players[i].nick === activePlayer.nick) {
+                    html += "<li><span style='font-weight: bold;'>" + players[i].nick + "</span>: " + players[i].points + "</li>\n"
+                } else {
+                    html += "<li>" + players[i].nick + ": " + players[i].points + "</li>\n"
+                }
+            }
+            html += "</ul>\n"
+        $( "div.players" ).html( html );
+    }
+
+    function showSnackBarGreen() {
+        var x = document.getElementById("snackbarGreen");
+        x.className = "show";
+        setTimeout(function(){ x.className = x.className.replace("show", ""); }, 2000);
+    }
+
+    function categorySelected(event) {
+        console.log(event);
+        let e = event.target.id;
+        if (!e) {
+            if(event.patch) {
+                e = event.path[1].id;
+            } else {
+                e = event.target.parentElement.id;
+            }
+        }
+        console.log(e);
+        let questions = JSON.parse(localStorage.getItem('questions'));
+        let player = JSON.parse(localStorage.getItem('categoryActivePlayer'));
+        for (let i = 0; i < questions.length; i++ ) {
+            if (questions[i].name === e) {
+                localStorage.setItem('category', JSON.stringify(questions[i]));
+                localStorage.setItem('activePlayer', JSON.stringify(player));
+                break;
+            }
+        }
+        location.href = "gra.html";
+    }
+</script>
+<div class="maincontainer">
+    <div class="secondcontainer" id="secondcontainer">
+        <div class='gameheader' id='gameheader'>            
+            <div class='showActivePlayer'>
+                <div id="snackbarGreen" style="left: 20%;"></div>
+                <div id='aktywnygracz'>Aktywny gracz:</div>
+                <span class="activePlayer">&nbsp;</span>
+            </div>  
+            <h1 style="text-align: center;" id="wybierzkategorie">Wybierz kategorię</h1>
+            <div class="parentcategories" id='parentcategories'>
+                <div class="categoriescontainer"></div>
+            </div>
+        </div>
+        <div class="rightcontainer">
+            <button onclick="location.href='index.html'" class="exitBtn" title='Zakończ rozgrywkę'>X</button>
+            <div id="scoreboard">
+                <h1 style='text-align: center;' id="rightheader">Tabela wyników</h1>
+                <div class="players" id="players"></div>
+                <div class='showResults' id="showResults">
+                    <div class="results" style="font-size: 40px;">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+</div>
+
+</body>
+</html>
